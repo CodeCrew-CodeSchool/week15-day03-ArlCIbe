@@ -1,133 +1,188 @@
-﻿using System.Globalization;
-using System.Runtime.Remoting;
-using System.Security;
-using System.Security.Cryptography.X509Certificates;
+﻿using System;
 
-namespace tictactoe;
-/*NOTE: The starter code for this assignment is no longer available, since we went over it together in class. I'm still going to attempt it on my own and will ask DJ if I get stuck.*/
-
-class Program
+namespace tictactoe
 {
-    static void Main(string[] args)
+    class Program
     {
-        Console.WriteLine("Hi! Welcome to your game of Tic-Tac-Toe!\n");
-        Console.WriteLine("Here's your starting board:\n");
-        Console.WriteLine("|1||2||3|");
-        Console.WriteLine("|4||5||6|");
-        Console.WriteLine("|5||6||9|\n");
-        Console.WriteLine("The first player that get three markers in a diagonal, vertical, or horizontal line wins.\n");
-
-        string[] markerArray = ["X", "x", "O", "o"];//used upper and lower case for better user experience; they may not notice which they're putting in
-        string marker = Console.ReadLine()!;
-        marker = ChooseMarker(markerArray, marker);
-
-        string[] nameArray = new string[2];    
-        string name = Console.ReadLine()!;//temporary placeholder for names
-        name = ArrayName(nameArray, name);//
-    
-        Player player1 = new()
+        static void Main(string[] args)
         {
-            Name = name,
-            Marker = marker
-        };
-        Console.WriteLine("Player 1, please enter your name: " + name);
-        Console.WriteLine("Please either X or O: " + marker);
-        Console.WriteLine(player1.Name + ", your marker is " + player1.Marker);
+            Console.WriteLine("Hi! Welcome to your game of Tic-Tac-Toe!\n");
 
-        Console.WriteLine("");
-        
-        Player player2 = new()
-        {
-            Name = name,
-            Marker = marker
-        };
-        Console.WriteLine("Player 2, please enter your name: " + name);
-        Console.WriteLine(player2.Name + ", your marker is " + player2.Marker);
+            string[] markerArray = { "X", "O" };
 
-        NameArray(nameArray, name);
-    }
-        public static string ArrayName(string[] nameArray, string name)
-        {
-            for (int nameInput = 0; nameInput >= nameArray.Length; nameInput++)
+            Console.Write("Player 1, please enter your name: ");
+            string player1Name = Console.ReadLine()!;//temporarily stores players' input
+            string player1Marker = ChooseMarker(markerArray);
+
+            Console.Write("Player 2, please enter your name: ");
+            string player2Name = Console.ReadLine()!;
+            string player2Marker = player1Marker == "X" ? "O" : "X";//player 2's marker is chosen based on player 1's marker choice
+            //Player instances
+            Player player1 = new Player
             {
-                name = nameArray[nameInput];
+                Name = player1Name,
+                Marker = player1Marker
+            };
+
+            Player player2 = new Player
+            {
+                Name = player2Name,
+                Marker = player2Marker
+            };
+
+            Console.WriteLine($"{player1.Name}, your marker is {player1.Marker}");
+            Console.WriteLine($"{player2.Name}, your marker is {player2.Marker}");
+
+            Game game = new Game(player1, player2);//constructor creates Game instance that passes in the the Player instances
+            game.StartGame();
+        }
+
+        public static string ChooseMarker(string[] markerArray)
+        {
+            while (true)
+            {
+                Console.Write("Please choose either X or O: ");
+                string marker = Console.ReadLine()!.ToUpper();//for better UX; players might not notice if they're using upper or lower case
+                if (Array.Exists(markerArray, element => element == marker))//checks if user is entering anything other than x or o
+                {
+                    return marker;
+                }
+                else
+                {
+                    Console.WriteLine("Error: Please choose either X or O.");
+                }
             }
-            return name;
-        }//populates the nameArray with user input; stores the value of each nameArray element in name variable
-        public static string[] NameArray(string[] nameArray, string name)
+        }
+    }
+
+    public class Player
+    {
+        public string Marker { get; set; }
+        public string Name { get; set; }
+    }
+
+    public class Game
+    {
+        private Player player1;
+        private Player player2;
+        private string[,] board = new string[3, 3];
+        private Player currentPlayer;
+
+        public Game(Player player1, Player player2)
         {
-            ArrayName(nameArray, name);
-            return nameArray;
-        }//calls the function that populates nameArray and then actually returns that it
-        public static string ChooseMarker(string[] markerArray, string marker)
-        {                   
-            try
+            this.player1 = player1;
+            this.player2 = player2;
+            currentPlayer = player1;
+            InitializeBoard();
+        }
+
+        private void InitializeBoard()//creates the board in 3x3 lines
+        {
+            for (int i = 0; i < 3; i++)
             {
-                marker = Console.ReadLine()!;
-                bool notExOrOh = marker != markerArray[1] || marker != markerArray[2] || marker != markerArray[3] || marker != markerArray[4];
-                    if(notExOrOh)
+                for (int j = 0; j < 3; j++)
+                {
+                    board[i, j] = " ";
+                }
+            }
+        }
+
+        public void StartGame()
+        {
+            bool gameWon = false;//tracks game result
+            while (!gameWon && !IsBoardFull())
+            {
+                DisplayBoard();//current board
+                PlayerMove(currentPlayer);
+                gameWon = CheckWin();//checks game result after each turn
+                if (!gameWon)
+                {
+                    SwitchPlayer();//switches if game's not won
+                }
+            }
+            DisplayBoard();//final board
+            if (gameWon)
+            {
+                Console.WriteLine($"{currentPlayer.Name} wins!");
+            }
+            else
+            {
+                Console.WriteLine("It's a draw!");//board is full with no winner
+            }
+        }
+
+        private void DisplayBoard()
+        {
+            Console.WriteLine("  0 1 2");//first row of board
+            for (int i = 0; i < 3; i++)//runs for each column
+            {
+                Console.Write(i + " ");//adds spaces
+                for (int j = 0; j < 3; j++)//runs for each row
+                {
+                    Console.Write(board[i, j]);//value of current cell
+                    if (j < 2) Console.Write("|");//line only between columns
+                }
+                Console.WriteLine();
+                if (i < 2) Console.WriteLine("  -----");//line only between 2 rows
+            }
+        }
+
+        private void PlayerMove(Player player)
+        {
+            int row, col;
+            while (true)
+            {
+                Console.WriteLine($"{player.Name}, it's your turn. Enter row and column (0, 1, 2):");
+                string[] inputs = Console.ReadLine()!.Split(' ');//row and column choice
+                if (inputs.Length == 2 && int.TryParse(inputs[0], out row) && int.TryParse(inputs[1], out col))//Checks if the player entered exactly two numbers convert input to row and the second to col.
+                {
+                    if (row >= 0 && row < 3 && col >= 0 && col < 3 && board[row, col] == " ")
                     {
-                        throw new Exception("Error: Pleas choose either X or O.");
+                        board[row, col] = player.Marker;
+                        break;
                     }
-                return marker;
+                }
+                Console.WriteLine("Invalid move. Try again.");
             }
-            catch
+        }
+
+        private void SwitchPlayer()
+        {
+            currentPlayer = currentPlayer == player1 ? player2 : player1;
+        }
+
+        private bool IsBoardFull()//every cell full with x or o
+        {
+            for (int i = 0; i < 3; i++)
             {
-                throw;
-            }
-        }
-        public class Player
-        {//instance fields of each Player instance
-            public string Marker;
-            public string Name;
-        }
-        public class GameBoard
-        {
-            public string[] markerArray = ["X", "x", "O", "o"];
-            public static string ChooseMarker(string[] markerArray, string marker){
-                try
+                for (int j = 0; j < 3; j++)
                 {
-                    marker = Console.ReadLine()!;
-                    bool notExOrOh = marker != markerArray[1] || marker != markerArray[2] || marker != markerArray[3] || marker != markerArray[4];
-                        if(notExOrOh)
-                        {
-                            throw new Exception("Error: Pleas choose either X or O.");
-                        }
-                    return marker;
-                }
-                catch
-                {
-                    throw;
-                }
-        }
-        public class Game
-        {
-            public string[] markerArray = ["X", "x", "O", "o"];
-            
-            public static string ChooseMarker(string[] markerArray, string marker){
-                try
-                {
-                    marker = Console.ReadLine()!;
-                    bool notExOrOh = marker != markerArray[1] || marker != markerArray[2] || marker != markerArray[3] || marker != markerArray[4];
-                        if(notExOrOh)
-                        {
-                            throw new Exception("Error: Pleas choose either X or O.");
-                        }
-                    return marker;
-                }
-                catch
-                {
-                    throw;
+                    if (board[i, j] == " ")
+                    {
+                        return false;
+                    }
                 }
             }
-            public static string[] NameArray(string[] nameArray, string name)
+            return true;
+        }
+
+        private bool CheckWin()
+        {
+            // Check rows, columns, and diagonals
+            for (int i = 0; i < 3; i++)
             {
-                ArrayName(nameArray, name);
-                return nameArray;
+                if ((board[i, 0] == currentPlayer.Marker && board[i, 1] == currentPlayer.Marker && board[i, 2] == currentPlayer.Marker) ||
+                    (board[0, i] == currentPlayer.Marker && board[1, i] == currentPlayer.Marker && board[2, i] == currentPlayer.Marker))
+                {
+                    return true;
+                }
             }
-        }//switch between players - declare winner or tie - 
-        public class Position
-        {
-            //apply markers to different positions on the board
+            if ((board[0, 0] == currentPlayer.Marker && board[1, 1] == currentPlayer.Marker && board[2, 2] == currentPlayer.Marker) ||
+                (board[0, 2] == currentPlayer.Marker && board[1, 1] == currentPlayer.Marker && board[2, 0] == currentPlayer.Marker))
+            {
+                return true;
+            }
+            return false;
         }
     }
+}
